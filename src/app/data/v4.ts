@@ -4803,6 +4803,23 @@ export const config4 = {
             subsystem_id: 'eltek01',
             controller_instance_idx: 0,
             sampling: 'sum'
+        },
+        {
+            name: 'Load Amperes',
+            type: 'line',
+            field: 'load_a',
+            device_id: 'smartpack_s_1',
+            dimensions: [
+                'time',
+                'mean'
+            ],
+            symbolSize: 1,
+            xAxisIndex: 0,
+            yAxisIndex: 1,
+            datasetIndex: 3,
+            subsystem_id: 'eltek01',
+            controller_instance_idx: 0,
+            sampling: 'sum'
         }
     ],
     tooltip: {

@@ -1,7 +1,4 @@
 import { Component, OnInit, ElementRef, ViewChild, OnDestroy } from '@angular/core';
-import { tableSrc } from '../table-src';
-import { table1 } from '../data';
-import { table4 } from '../data';
 import { config4 } from '../data';
 
 import * as d3 from 'd3';
@@ -17,28 +14,23 @@ export class TableComponent implements OnInit, OnDestroy {
 
 
   @ViewChild('table', { static: true }) table: ElementRef;
-  @ViewChild('svg', { static: true }) svg: ElementRef;
+  @ViewChild('svg', { static: true }) svgRef: ElementRef;
 
   constructor(private data: DataService) {
-    console.log(this.data.getDataArray(3));
+
   }
 
+  svgConfig = {
+    svgWidth: 1000,
+    svgHeight: 600,
+    margin: { top: 20, right: 20, bottom: 30, left: 50 },
+    width: 1000 - 70,
+    height: 600 - 50
+  };
 
   title = 'd3Charts';
-  // dataSource = table4.map(({ field, source, device_id, subsystem_id, controller_instance }) => ({
-  //   field,
-  //   source: source.map(({ mean, time }) => ({
-  //     mean,
-  //     time: new Date(time)
-  //   })),
-  //   device_id,
-  //   subsystem_id,
-  //   controller_instance
-  // }));
 
-  dataSource = this.data.getDataArray(1);
-
-
+  dataSource = this.data.getDataArray(5);
 
 
   series = config4.series;
@@ -53,103 +45,167 @@ export class TableComponent implements OnInit, OnDestroy {
 
   liveDataToggle$ = new Subject();
 
+  lineCollection = [];
 
+  dataBox;
+  svg;
+  x;
+  y;
+
+  xAxis;
   stopLive() {
     this.liveDataToggle$.next();
   }
 
   goLive() {
-    const lastMean = this.dataSource[0].source[this.dataSource[0].source.length - 1].mean;
+    const lastMean = this.dataSource.map((x, i) => x.source[this.dataSource[i].source.length - 1].mean);
+
 
     this.data
       .getLiveData(lastMean)
       .pipe(takeUntil(this.liveDataToggle$))
-      .subscribe(x => {
-        console.log(x);
+      .subscribe(t => {
 
-        this.dataSource[0].source.shift();
-        this.dataSource[0].source.push(x[0]);
+        this.dataSource.forEach((dataSegment, i) => {
+          dataSegment.source.shift();
+          dataSegment.source.push(t[i]);
+        });
+
+
+        this.x.domain([
+          this.dataSource[0].source[0].time,
+          this.dataSource[0].source[this.dataSource[0].source.length - 1].time
+        ])
+          .rangeRound([0, this.svgConfig.width]);
+
+        this.x.domain(d3.extent(this.dataSource[0].source, (d) => d.time));
+
+
+        const formatTime = d3.timeFormat('%B %d, %Y');
+
+        this.xAxis.call(
+          d3.axisBottom(this.x)
+            .tickFormat(
+              (y) => {
+                return formatTime(new Date(y as any));
+              }))
+          .select('.domain')
+          .remove();
+
+        /**
+         * Generates the y axis
+         */
+        this.y = d3.scaleLinear()
+          .range([this.svgConfig.height, 0]);
+        // Set the y axis labels
+        this.y.domain([0, 300])
+          .nice();
+
+
+        const line = d3.line<{ time: Date, mean: number }>()
+          .x((d) => this.x(d.time))
+          .y((d) => this.y(d.mean));
+
+        this.dataSource.forEach((data, i) => {
+          this.lineCollection[i]
+            .datum(data.source)
+            .attr('fill', 'none')
+            .attr('stroke', this.colors[i % this.colors.length])
+            .attr('stroke-linejoin', 'round')
+            .attr('stroke-linecap', 'round')
+            .attr('stroke-width', 2)
+            .attr('d', line);
+        });
       });
   }
 
-  ngOnInit() {
 
+  ngOnInit() {
+    this.dataBox = d3.select(this.table.nativeElement);
+    this.svg = d3.select(this.svgRef.nativeElement)
+      .attr('width', this.svgConfig.svgWidth)
+      .attr('height', this.svgConfig.svgHeight);
+
+    this.render();
+
+  }
+
+  render() {
 
     // const dataBox = d3.select('.data-box');
-    const dataBox = d3.select(this.table.nativeElement);
+    // const dataBox = d3.select(this.table.nativeElement);
 
-    const svgWidth = 1000;
-    const svgHeight = 600;
-    const margin = { top: 20, right: 20, bottom: 30, left: 50 };
-    const width = svgWidth - margin.left - margin.right;
-    const height = svgHeight - margin.top - margin.bottom;
 
-    const svg = d3.select(this.svg.nativeElement)
-      .attr('width', svgWidth)
-      .attr('height', svgHeight);
+    const g = this.svg.append('g')
+      .attr('transform', 'translate(' + this.svgConfig.margin.left + ',' + this.svgConfig.margin.top + ')');
 
-    const g = svg.append('g')
-      .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
-
-    const x = d3.scaleTime()
+    this.x = d3.scaleTime()
       .domain([
         this.dataSource[0].source[0].time,
         this.dataSource[0].source[this.dataSource[0].source.length - 1].time
       ])
-      .rangeRound([0, width]);
+      .rangeRound([0, this.svgConfig.width]);
 
-    x.domain(d3.extent(this.dataSource[0].source, (d) => d.time));
+    this.x.domain(d3.extent(this.dataSource[0].source, (d) => d.time));
 
 
     /**
      * Generates the y axis
      */
-    const y = d3.scaleLinear()
-      .range([height, 0]);
+    this.y = d3.scaleLinear()
+      .range([this.svgConfig.height, 0]);
     // Set the y axis labels
-    y.domain([0, 300])
+    this.y.domain([0, 300])
       .nice();
-    const yAxisGenerator = d3.axisLeft(y);
+
+    const yAxisGenerator = d3.axisLeft(this.y);
     yAxisGenerator.ticks(5);
     yAxisGenerator.tickFormat((d, i) => d + ' V');
 
-    const yAxis = g.append('g')
+    g.append('g')
       .call(yAxisGenerator);
 
     // Time format
     const formatTime = d3.timeFormat('%B %d, %Y');
-    g.append('g')
-      .attr('transform', 'translate(0,' + height + ')')
-      .call(
-        d3.axisBottom(x)
-          .tickFormat(
-            (y) => {
-              console.log(y);
-              return formatTime(new Date(y as any));
-            }))
+    this.xAxis = g.append('g')
+      .attr('transform', 'translate(0,' + this.svgConfig.height + ')');
+
+    this.xAxis.call(
+      d3.axisBottom(this.x)
+        .tickFormat(
+          (y) => {
+            return formatTime(new Date(y as any));
+          }))
       .select('.domain')
       .remove();
 
     const line = d3.line<{ time: Date, mean: number }>()
-      .x((d) => x(d.time))
-      .y((d) => y(d.mean));
+      .x((d) => this.x(d.time))
+      .y((d) => this.y(d.mean));
 
 
     this.dataSource.forEach((data, i) => {
-      g.append('path')
+      this.lineCollection.push(g.append('path')
         .datum(data.source)
         .attr('fill', 'none')
         .attr('stroke', this.colors[i % this.colors.length])
         .attr('stroke-linejoin', 'round')
         .attr('stroke-linecap', 'round')
         .attr('stroke-width', 2)
-        .attr('d', line);
+        .attr('d', line));
     });
 
-    console.log(x, ' < info for x');
-    console.log(y, ' <= info for y');
 
-    this.showData(this.dataSource, svg, height, width, margin, dataBox, y, x);
+    this.showData(
+      this.dataSource,
+      this.svg,
+      this.svgConfig.height,
+      this.svgConfig.width,
+      this.svgConfig.margin,
+      this.dataBox,
+      this.y,
+      this.x
+    );
   }
 
 
@@ -163,7 +219,6 @@ export class TableComponent implements OnInit, OnDestroy {
   }
 
   showData(data, svg, height, width, margin, dataBox, yScale, xScale) {
-    svg.append('div').text('Hello');
 
     const mouseG = svg.append('g')
       .attr('class', 'mouse-over-effects');
@@ -219,7 +274,6 @@ export class TableComponent implements OnInit, OnDestroy {
 
         yTextHandler.mouseMove(mouse[0], mouse[1], yScale.invert(mouse[1]).toFixed(2));
         xTextHandler.mouseMove(mouse[0], mouse[1], formatTime(xScale.invert(mouse[0])));
-
         this.writeData(xScale.invert(mouse[0]));
       })
       .on('mouseout', () => {

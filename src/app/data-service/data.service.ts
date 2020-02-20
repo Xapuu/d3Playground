@@ -19,15 +19,30 @@ export class DataService implements OnDestroy {
 
 
   getLiveData(startValue) {
-    let start = startValue;
+    const start = startValue;
+
+    console.log('start', start);
+    let mockTimePass = 0;
+
 
     return interval(1000)
       .pipe(
         takeUntil(this.isAlive$),
-        map(x => [{
-          mean: this.incrementDecrement() ? start -= 1 : start += 1,
-          time: new Date()
-        }])
+        map(x => {
+          const d = new Date();
+          d.setDate(d.getDate() + mockTimePass);
+          mockTimePass++;
+
+          return start.map((_, i) => {
+            start[i] = this.incrementDecrement() ? start[i] -= 10 : start[i] += 1;
+            return {
+              id: i,
+              mean: start[i] < 0 ? 0 : start[i],
+              time: d
+            };
+          });
+        }
+        )
       );
   }
 
