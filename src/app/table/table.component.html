@@ -1,0 +1,23 @@
+<div class="chart-container" [ngStyle]="{
+  'height':height+'px',
+  'width':width +'px',
+  'position':'relative'
+}">
+  <svg #svg class="line-chart"></svg>
+  <div #table class="data-box">
+    <div class="data-box-row" *ngFor="let el of series; let i=index">
+      <div class="data-box-identifier">
+        <div class="data-box-identifier-el" [ngStyle]="{'background': colors[i]}"></div>
+      </div>
+      <div class="data-box-data">
+        <div class="data-box-data-el">{{ el.name }}</div>
+        <div class="data-box-data-el" *ngIf="hoveredData">{{hoveredData[i]?.nodeResult?.mean | number:'1.1-2'}}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button (click)="goLive()">Go Live</button>
+<!-- <pre>
+  {{hoveredData | json}}
+</pre> -->
